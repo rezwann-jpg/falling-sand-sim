@@ -13,5 +13,9 @@ typedef struct {
 
 bool init();
 void run();
+void cleanup();
+void draw();
+void update();
+void handle_events();
 
 #endif

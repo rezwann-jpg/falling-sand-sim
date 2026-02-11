@@ -7,5 +7,7 @@ int main(int argc, char* argv[]) {
 
     run();
 
+    cleanup();
+
     return 0;
 }
