@@ -2,13 +2,14 @@
 #define GAME_H_
 
 #include <SDL3/SDL.h>
-#include <SDL3/SDL_render.h>
-#include <SDL3/SDL_video.h>
 
 typedef struct {
     SDL_Window* window;
     SDL_Renderer* renderer;
+    SDL_Texture* texture;
     bool running;
+    int width;
+    int height;
 } Game;
 
 bool init();
@@ -17,5 +18,8 @@ void cleanup();
 void draw();
 void update();
 void handle_events();
+
+void update_texture();
+void render_texture();
 
 #endif

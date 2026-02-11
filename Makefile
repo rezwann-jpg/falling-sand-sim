@@ -14,7 +14,7 @@ else
 endif
 
 CFLAGS       += -Wall -std=c11 -Iinclude
-LDFLAGS      :=
+LDFLAGS      := -lm
 
 ifneq ($(shell command -v pkg-config 2>/dev/null),)
     SDL_CFLAGS  := $(shell pkg-config --cflags sdl3 2>/dev/null)
