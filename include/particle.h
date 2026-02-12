@@ -16,6 +16,7 @@ typedef struct {
 
 extern const Particle SAND_PARTICLE;
 extern const Particle WATER_PARTICLE;
+extern const Particle AIR_PARTICLE;
 
 void init_particles();
 

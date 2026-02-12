@@ -14,7 +14,6 @@ typedef struct {
     unsigned int rng_state;
 } Simulation;
 
-static unsigned int rng_xorshift(Simulation *sim);
 bool sim_init(Simulation *sim);
 void sim_cleanup(Simulation *sim);
 

@@ -45,3 +45,66 @@ void sim_cleanup(Simulation *sim) {
     sim->pool = NULL;
     sim->free_list = NULL;
 }
+
+static inline int get_grid_idx(int x, int y) {
+    return y * SIM_WIDTH + x;
+}
+
+static inline bool in_bounds(int x, int y) {
+    return x >= 0 && x < SIM_WIDTH && y >= 0 && y < SIM_HEIGHT;
+}
+
+static inline Particle* get_particle(Simulation *sim, int x, int y) {
+    if (!in_bounds(x, y))
+        return NULL;
+    return sim->grid[get_grid_idx(x, y)];
+}
+
+static inline void set_paritcle(Simulation *sim, int x, int y, Particle *p) {
+    if (!in_bounds(x, y))
+        return;
+    sim->grid[get_grid_idx(x, y)] = p;
+}
+
+static void swap_particles(Simulation *sim, int x1, int y1, int x2, int y2) {
+    int idx1 = get_grid_idx(x1, y1);
+    int idx2 = get_grid_idx(x2, y2);
+
+    Particle *temp = sim->grid[idx1];
+    sim->grid[idx1] = sim->grid[idx2];
+    sim->grid[idx2] = temp;
+}
+
+bool sim_spawn_particles(Simulation *sim, int x, int y, ParticleType type) {
+    if (!in_bounds(x, y) || get_particle(sim, x, y) || sim->free_count == 0) {
+        return false;
+    }
+
+    int idx = sim->free_list[--sim->free_count];
+    Particle *p = &sim->pool[idx];
+
+    switch (type) {
+        case PARTICLE_SAND:
+            *p = SAND_PARTICLE;
+            break;
+        case PARTICLE_WATER:
+            *p = WATER_PARTICLE;
+            break;
+        default:
+            *p = AIR_PARTICLE;
+            break;
+    }
+
+    set_paritcle(sim, x, y, p);
+    return true;
+}
+
+void sim_remove_particle(Simulation *sim, int x, int y) {
+    Particle *p = get_particle(sim, x, y);
+    if (!p)
+        return;
+
+    int idx = p - sim->pool;
+    sim->free_list[sim->free_count++] = idx;
+    set_paritcle(sim, x, y, NULL);
+}

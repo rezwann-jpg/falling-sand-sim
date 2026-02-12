@@ -15,9 +15,6 @@ typedef struct {
 bool init();
 void run();
 void cleanup();
-void draw();
-void update();
-void handle_events();
 
 void update_texture();
 void render_texture();
