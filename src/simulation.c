@@ -1,5 +1,7 @@
 #include "simulation.h"
 #include "common.h"
+#include "particle.h"
+#include <math.h>
 #include <stdlib.h>
 #include <time.h>
 
@@ -107,4 +109,93 @@ void sim_remove_particle(Simulation *sim, int x, int y) {
     int idx = p - sim->pool;
     sim->free_list[sim->free_count++] = idx;
     set_paritcle(sim, x, y, NULL);
+}
+
+static void update_sand(Simulation *sim, int x, int y) {
+    if (in_bounds(x, y + 1) && !get_particle(sim, x, y + 1)) {
+        swap_particles(sim, x, y, x, y + 1);
+        return;
+    }
+
+    int dir = (rng_xorshift(sim) % 2) ? -1 : 1;
+
+    if (in_bounds(x + dir, y + 1) && !get_particle(sim, x + dir, y + 1)) {
+        swap_particles(sim, x, y, x + dir, y + 1);
+        return;
+    }
+
+    if (in_bounds(x - dir, y + 1) && !get_particle(sim, x - dir, y + 1)) {
+        swap_particles(sim, x, y, x - dir, y + 1);
+    }
+}
+
+static void update_water(Simulation *sim, int x, int y) {
+    if (in_bounds(x, y + 1) && !get_particle(sim, x, y + 1)) {
+        swap_particles(sim, x, y, x, y + 1);
+        return;
+    }
+
+    int dir = (rng_xorshift(sim) % 2) ? -1 : 1;
+
+    if (in_bounds(x + dir, y + 1) && !get_particle(sim, x + dir, y + 1)) {
+        swap_particles(sim, x, y, x + dir, y + 1);
+        return;
+    }
+
+    if (in_bounds(x - dir, y + 1) && !get_particle(sim, x - dir, y + 1)) {
+        swap_particles(sim, x, y, x - dir, y + 1);
+        return;
+    }
+
+    int flow_dir = (rng_xorshift(sim) % 2) ? -1 : 1;
+
+    if (in_bounds(x + flow_dir, y) && !get_particle(sim, x + flow_dir, y)) {
+        swap_particles(sim, x, y, x + flow_dir, y);
+        return;
+    }
+
+    if (in_bounds(x - flow_dir, y) && !get_particle(sim, x - flow_dir, y)) {
+        swap_particles(sim, x, y, x - flow_dir, y);
+    }
+}
+
+void sim_update(Simulation *sim) {
+    for (int y = SIM_HEIGHT - 1; y >= 0; y--) {
+        if (y % 2 == 0) {
+            for (int x = 0; x < SIM_WIDTH; x++) {
+                Particle *p = get_particle(sim, x, y);
+                if (!p)
+                    continue;
+
+                switch (p->type) {
+                    case PARTICLE_SAND:
+                        update_sand(sim, x, y);
+                        break;
+                    case PARTICLE_WATER:
+                        update_water(sim, x, y);
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+        else {
+            for (int x = 0; x < SIM_WIDTH; x++) {
+                Particle *p = get_particle(sim, x, y);
+                if (!p)
+                    continue;
+
+                switch (p->type) {
+                    case PARTICLE_SAND:
+                        update_sand(sim, x, y);
+                        break;
+                    case PARTICLE_WATER:
+                        update_water(sim, x, y);
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+    }
 }

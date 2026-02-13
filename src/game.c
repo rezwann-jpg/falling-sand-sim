@@ -1,6 +1,5 @@
 #include "game.h"
 #include "common.h"
-#include <SDL3/SDL_stdinc.h>
 #include <math.h>
 
 Game game = { 0 };
