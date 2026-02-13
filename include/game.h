@@ -2,6 +2,7 @@
 #define GAME_H_
 
 #include <SDL3/SDL.h>
+#include "simulation.h"
 
 typedef struct {
     SDL_Window* window;
@@ -10,7 +11,11 @@ typedef struct {
     bool running;
     int width;
     int height;
+
+    Simulation sim;
 } Game;
+
+extern Game game;
 
 bool init();
 void run();

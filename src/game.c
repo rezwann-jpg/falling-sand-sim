@@ -2,8 +2,6 @@
 #include "common.h"
 #include <math.h>
 
-Game game = { 0 };
-
 bool init() {
     game.width = WINDOW_WIDTH;
     game.height = WINDOW_HEIGHT;
