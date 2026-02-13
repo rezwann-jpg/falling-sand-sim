@@ -1,7 +1,5 @@
 #include "simulation.h"
 #include "common.h"
-#include "particle.h"
-#include <math.h>
 #include <stdlib.h>
 #include <time.h>
 
@@ -180,7 +178,7 @@ void sim_update(Simulation *sim) {
             }
         }
         else {
-            for (int x = 0; x < SIM_WIDTH; x++) {
+            for (int x = SIM_WIDTH - 1; x >= 0; x--) {
                 Particle *p = get_particle(sim, x, y);
                 if (!p)
                     continue;
@@ -196,6 +194,38 @@ void sim_update(Simulation *sim) {
                         break;
                 }
             }
+        }
+    }
+}
+
+void sim_brush_cirlce(Simulation *sim, int cx, int cy, int radius, ParticleType type) {
+    int r2 = radius * radius;
+
+    for (int dy = -radius; dy <= radius; dy++) {
+        for (int dx = -radius; dx <= radius; dx++) {
+            if (dx * dx + dy * dy > r2)
+                continue;
+
+            int x = cx + dx;
+            int y = cy + dy;
+
+            sim_spawn_particles(sim, x, y, type);
+        }
+    }
+}
+
+void sim_brush_erase(Simulation *sim, int cx, int cy, int radius) {
+    int r2 = radius * radius;
+
+    for (int dy = -radius; dy <= radius; dy++) {
+        for (int dx = -radius; dx <= radius; dx++) {
+            if (dx * dx + dy * dy > r2)
+                continue;
+
+            int x = cx + dx;
+            int y = cy + dy;
+
+            sim_remove_particle(sim, x, y);
         }
     }
 }

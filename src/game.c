@@ -1,10 +1,18 @@
 #include "game.h"
 #include "common.h"
+#include "particle.h"
+#include "simulation.h"
+#include <SDL3/SDL_events.h>
 #include <math.h>
+#include <stdio.h>
+
+Game game = { 0 };
 
 bool init() {
     game.width = WINDOW_WIDTH;
     game.height = WINDOW_HEIGHT;
+    game.brush_size = 3;
+    game.current_type = PARTICLE_SAND;
 
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         SDL_Log("SDL init failed: %s", SDL_GetError());
@@ -15,7 +23,7 @@ bool init() {
         "Falling Sand",
         game.width,
         game.height,
-        SDL_WINDOW_RESIZABLE | SDL_WINDOW_TRANSPARENT
+        SDL_WINDOW_TRANSPARENT
     );
 
     if (!game.window) {
@@ -64,9 +72,29 @@ bool init() {
         return false;
     }
 
+    if (!sim_init(&game.sim)) {
+        fprintf(stderr, "Simulation init error\n");
+        return false;
+    }
+
     game.running = true;
 
     return true;
+}
+
+void screen_to_sim(int screen_x, int screen_y, int *sim_x, int *sim_y) {
+    float scale = fminf(
+        (float)game.width / SIM_WIDTH,
+        (float)game.height / SIM_HEIGHT
+    );
+
+    float render_w = SIM_WIDTH * scale;
+    float render_h = SIM_HEIGHT * scale;
+    float offset_x = (game.width - render_w) / 2;
+    float offset_y = (game.height - render_h) / 2;
+
+    *sim_x = (int)((screen_x - offset_x) / scale);
+    *sim_y = (int)((screen_y - offset_y) / scale);
 }
 
 void update_texture() {
@@ -89,10 +117,20 @@ void update_texture() {
     }
 
     for (int y = 0; y < SIM_HEIGHT; y++) {
+        Uint32 *row = pixel_buffer + y * row_pixels;
         for (int x = 0; x < SIM_WIDTH; x++) {
+            Particle *p = game.sim.grid[y * SIM_WIDTH + x];
 
+            if (p) {
+                row[x] = (p->color.a << 24) |
+                         (p->color.b << 16) |
+                         (p->color.g << 8) |
+                         (p->color.r);
+            }
         }
     }
+
+    SDL_UnlockTexture(game.texture);
 }
 
 void render_texture() {
@@ -131,11 +169,72 @@ void handle_events() {
                 game.width = event.window.data1;
                 game.height = event.window.data2;
                 break;
+
+
+            case SDL_EVENT_MOUSE_MOTION:
+                game.mouse_x = (int)event.motion.x;
+                game.mouse_y = (int)event.motion.y;
+                break;
+
+            case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                if (event.button.button == SDL_BUTTON_LEFT)
+                    game.mouse_left = true;
+                if (event.button.button == SDL_BUTTON_RIGHT)
+                    game.mouse_right = true;
+                break;
+
+            case SDL_EVENT_MOUSE_BUTTON_UP:
+                if (event.button.button == SDL_BUTTON_LEFT)
+                    game.mouse_left = false;
+                if (event.button.button == SDL_BUTTON_RIGHT)
+                    game.mouse_right = false;
+                break;
+
+            case SDL_EVENT_MOUSE_WHEEL:
+                game.brush_size += (int)event.wheel.y;
+                if (game.brush_size < 1) game.brush_size = 1;
+                if (game.brush_size > 20) game.brush_size = 20;
+                break;
+
+            case SDL_EVENT_KEY_DOWN:
+                switch (event.key.key) {
+                    case SDLK_1:
+                        game.current_type = PARTICLE_SAND;
+                        break;
+                    case SDLK_2:
+                        game.current_type = PARTICLE_WATER;
+                        break;
+                    case SDLK_C:
+                        for (int i = 0; i < SIM_WIDTH * SIM_HEIGHT; i++) {
+                            if (game.sim.grid[i]) {
+                                int y = i / SIM_WIDTH;
+                                int x = i % SIM_WIDTH;
+                                sim_remove_particle(&game.sim, x, y);
+                            }
+                        }
+                        break;
+                }
+                break;
         }
     }
 }
 
+void handle_input() {
+    int sim_x, sim_y;
+    screen_to_sim(game.mouse_x, game.mouse_y, &sim_x, &sim_y);
+
+    if (game.mouse_left) {
+        sim_brush_cirlce(&game.sim, sim_x, sim_y, game.brush_size, game.current_type);
+    }
+
+    if (game.mouse_right) {
+        sim_brush_erase(&game.sim, sim_x, sim_y, game.brush_size);
+    }
+}
+
 void update() {
+    handle_input();
+    sim_update(&game.sim);
     update_texture();
 }
 
@@ -173,6 +272,7 @@ void run() {
 }
 
 void cleanup() {
+    sim_cleanup(&game.sim);
     SDL_DestroyTexture(game.texture);
     SDL_DestroyRenderer(game.renderer);
     SDL_DestroyWindow(game.window);

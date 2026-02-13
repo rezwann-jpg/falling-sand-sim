@@ -16,5 +16,9 @@ typedef struct {
 
 bool sim_init(Simulation *sim);
 void sim_cleanup(Simulation *sim);
+void sim_update(Simulation *sim);
+void sim_brush_cirlce(Simulation *sim, int cx, int cy, int radius, ParticleType type);
+void sim_brush_erase(Simulation *sim, int cx, int cy, int radius);
+void sim_remove_particle(Simulation *sim, int x, int y);
 
 #endif
