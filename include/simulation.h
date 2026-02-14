@@ -4,6 +4,8 @@
 #include "particle.h"
 #include <stdbool.h>
 
+#define GRAVITY 0.5f;
+
 typedef struct {
     int width;
     int height;
@@ -12,6 +14,7 @@ typedef struct {
     int *free_list;
     int free_count;
     unsigned int rng_state;
+    int current_tick;
 } Simulation;
 
 bool sim_init(Simulation *sim);
