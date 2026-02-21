@@ -1,6 +1,5 @@
 #include "simulation.h"
 #include "common.h"
-#include "particle.h"
 #include <stdlib.h>
 #include <time.h>
 
@@ -15,23 +14,13 @@ bool sim_init(Simulation *sim) {
     sim->width = SIM_WIDTH;
     sim->height = SIM_HEIGHT;
     sim->rng_state = (unsigned int)time(NULL);
+    sim->current_tick = 0;
 
-    sim->grid = (Particle **)calloc(SIM_WIDTH * SIM_HEIGHT, sizeof(Particle *));
-    if (!sim->grid)
+    particles_init_colors();
+
+    sim->grid = calloc(SIM_WIDTH * SIM_HEIGHT, sizeof(Particle));
+    if (!sim->grid) {
         return false;
-
-    int max_particles = SIM_WIDTH * SIM_HEIGHT;
-    sim->pool = (Particle *)malloc(max_particles * sizeof(Particle));
-    sim->free_list = (int *)malloc(max_particles * sizeof(int));
-
-    if (!sim->pool || !sim->free_list) {
-        sim_cleanup(sim);
-        return false;
-    }
-
-    sim->free_count = max_particles;
-    for (int i = 0; i < max_particles; i++) {
-        sim->free_list[i] = i;
     }
 
     return true;
@@ -39,15 +28,10 @@ bool sim_init(Simulation *sim) {
 
 void sim_cleanup(Simulation *sim) {
     free(sim->grid);
-    free(sim->pool);
-    free(sim->free_list);
-
     sim->grid = NULL;
-    sim->pool = NULL;
-    sim->free_list = NULL;
 }
 
-static inline int get_grid_idx(int x, int y) {
+static inline int idx(int x, int y) {
     return y * SIM_WIDTH + x;
 }
 
@@ -55,49 +39,52 @@ static inline bool in_bounds(int x, int y) {
     return x >= 0 && x < SIM_WIDTH && y >= 0 && y < SIM_HEIGHT;
 }
 
-static inline Particle* get_particle(Simulation *sim, int x, int y) {
-    if (!in_bounds(x, y))
-        return NULL;
-    return sim->grid[get_grid_idx(x, y)];
-}
+// static inline Particle* get_particle(Simulation *sim, int x, int y) {
+//     if (!in_bounds(x, y))
+//         return NULL;
+//     return sim->grid[get_grid_idx(x, y)];
+// }
 
-static inline void set_particle(Simulation *sim, int x, int y, Particle *p) {
-    if (!in_bounds(x, y))
-        return;
-    sim->grid[get_grid_idx(x, y)] = p;
-}
+// static inline void set_particle(Simulation *sim, int x, int y, Particle *p) {
+//     if (!in_bounds(x, y))
+//         return;
+//     sim->grid[get_grid_idx(x, y)] = p;
+// }
 
 static void swap_particles(Simulation *sim, int x1, int y1, int x2, int y2) {
-    int idx1 = get_grid_idx(x1, y1);
-    int idx2 = get_grid_idx(x2, y2);
+    int idx1 = idx(x1, y1);
+    int idx2 = idx(x2, y2);
 
-    Particle *temp = sim->grid[idx1];
+    Particle temp = sim->grid[idx1];
     sim->grid[idx1] = sim->grid[idx2];
     sim->grid[idx2] = temp;
 }
 
 bool sim_spawn_particles(Simulation *sim, int x, int y, ParticleType type) {
-    if (!in_bounds(x, y) || get_particle(sim, x, y) || sim->free_count == 0) {
+    if (!in_bounds(x, y))
+           return false;
+
+    Particle *p = &sim->grid[idx(x,y)];
+    if (p->active)
         return false;
-    }
 
-    int idx = sim->free_list[--sim->free_count];
-    Particle *p = &sim->pool[idx];
+    p->type = type;
+    p->vx = 0;
+    p->vy = 0;
+    p->active = true;
+    p->last_updated_tick = -1;
 
-    *p = particle_create(type);
+    p->render_color = particles_get_packed_color(type);
 
-    set_particle(sim, x, y, p);
     return true;
 }
 
 void sim_remove_particle(Simulation *sim, int x, int y) {
-    Particle *p = get_particle(sim, x, y);
-    if (!p)
-        return;
-
-    int idx = p - sim->pool;
-    sim->free_list[sim->free_count++] = idx;
-    set_particle(sim, x, y, NULL);
+    if (!in_bounds(x,y)) return;
+    sim->grid[idx(x,y)].active = false;
+    sim->grid[idx(x, y)].type = PARTICLE_NONE;
+    sim->grid[idx(x, y)].vx = 0;
+    sim->grid[idx(x, y)].vy = 0;
 }
 
 static bool can_displace(Particle *a, Particle* b) {
@@ -116,7 +103,7 @@ static bool can_displace(Particle *a, Particle* b) {
 }
 
 static void update_powder(Simulation *sim, int x, int y) {
-    Particle *p = get_particle(sim, x, y);
+    Particle *p = &sim->grid[idx(x, y)];
 
     if (!p)
         return;
@@ -135,7 +122,7 @@ static void update_powder(Simulation *sim, int x, int y) {
 
     for (int i = move_y; i >= 1; i--) {
         if (in_bounds(x, y + i)) {
-            Particle *below = get_particle(sim, x, y + i);
+            Particle *below = &sim->grid[idx(x, y + i)];
             if (can_displace(p, below)) {
                 swap_particles(sim, x, y, x, y + i);
                 return;
@@ -146,7 +133,7 @@ static void update_powder(Simulation *sim, int x, int y) {
     int dir = (rng_xorshift(sim) % 2) ? -1 : 1;
 
     if (in_bounds(x + dir, y + 1)) {
-        Particle *diag = get_particle(sim, x + dir, y + 1);
+        Particle *diag = &sim->grid[idx(x + dir, y + 1)];
         if (can_displace(p, diag)) {
             swap_particles(sim, x, y, x + dir, y + 1);
             p->vx = (float)dir * 0.5f;
@@ -155,7 +142,7 @@ static void update_powder(Simulation *sim, int x, int y) {
     }
 
     if (in_bounds(x - dir, y + 1)) {
-        Particle *diag = get_particle(sim, x - dir, y + 1);
+        Particle *diag = &sim->grid[idx(x - dir, y + 1)];
         if (can_displace(p, diag)) {
             swap_particles(sim, x, y, x - dir, y + 1);
             p->vx = (float)(-dir) * 0.5f;
@@ -168,7 +155,7 @@ static void update_powder(Simulation *sim, int x, int y) {
 }
 
 static void update_liquid(Simulation *sim, int x, int y) {
-    Particle *p = get_particle(sim, x, y);
+    Particle *p = &sim->grid[idx(x, y)];
     if (!p) return;
 
     const ParticleProperties *props = particles_get_properties(p->type);
@@ -184,7 +171,7 @@ static void update_liquid(Simulation *sim, int x, int y) {
 
     for (int i = move_y; i >= 1; i--) {
         if (in_bounds(x, y + i)) {
-            Particle *below = get_particle(sim, x, y + i);
+            Particle *below = &sim->grid[idx(x, y + i)];
             if (can_displace(p, below)) {
                 swap_particles(sim, x, y, x, y + i);
                 return;
@@ -194,13 +181,13 @@ static void update_liquid(Simulation *sim, int x, int y) {
 
     int dir = (rng_xorshift(sim) % 2) ? -1 : 1;
 
-    Particle *diag1 = get_particle(sim, x + dir, y + 1);
+    Particle *diag1 = &sim->grid[idx(x + dir, y + 1)];
     if (can_displace(p, diag1)) {
         swap_particles(sim, x, y, x + dir, y + 1);
         return;
     }
 
-    Particle *diag2 = get_particle(sim, x - dir, y + 1);
+    Particle *diag2 = &sim->grid[idx(x - dir, y + 1)];
     if (can_displace(p, diag2)) {
         swap_particles(sim, x, y, x - dir, y + 1);
         return;
@@ -214,7 +201,7 @@ static void update_liquid(Simulation *sim, int x, int y) {
 
         for (int i = 1; i <= flow_distance; i++) {
             int nx = x + i * current_dir;
-            Particle *side = get_particle(sim, nx, y);
+            Particle *side = &sim->grid[idx(nx, y)];
 
             if (!in_bounds(nx, y)) break;
 
@@ -281,11 +268,15 @@ static void update_liquid(Simulation *sim, int x, int y) {
 // }
 
 void update_particle(Simulation *sim, int x, int y) {
-    Particle *p = get_particle(sim, x, y);
-    if (!p || p->updated)
+    Particle *p = &sim->grid[idx(x, y)];
+
+    if (!p->active)
         return;
 
-    p->updated = true;
+    if (p->last_updated_tick == sim->current_tick)
+        return;
+
+    p->last_updated_tick = sim->current_tick;
 
     const ParticleProperties *props = particles_get_properties(p->type);
 
@@ -341,12 +332,6 @@ void sim_update(Simulation *sim) {
 
     sim->current_tick++;
 
-    for (int i = 0; i < SIM_WIDTH * SIM_HEIGHT; i++) {
-        if (sim->grid[i]) {
-            sim->grid[i]->updated = false;
-        }
-    }
-
     bool left_to_right = (sim->current_tick % 2) == 0;
 
     for (int y = SIM_HEIGHT - 1; y >= 0; y--) {
@@ -392,4 +377,8 @@ void sim_brush_erase(Simulation *sim, int cx, int cy, int radius) {
             sim_remove_particle(sim, x, y);
         }
     }
+}
+
+void sim_clear(Simulation *sim) {
+    memset(sim->grid, 0, sizeof(Particle) * SIM_WIDTH * SIM_HEIGHT);
 }

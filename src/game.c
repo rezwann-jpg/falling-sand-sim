@@ -1,5 +1,6 @@
 #include "game.h"
 #include "common.h"
+#include "simulation.h"
 #include <math.h>
 #include <stdio.h>
 
@@ -115,13 +116,10 @@ void update_texture() {
         Uint32 *row = pixel_buffer + y * row_pixels;
 
         for (int x = 0; x < SIM_WIDTH; x++) {
-            Particle *p = game.sim.grid[y * SIM_WIDTH + x];
+            Particle *p = &game.sim.grid[y * SIM_WIDTH + x];
 
-            if (p) {
-                row[x] = (p->color.a << 24) |
-                         (p->color.b << 16) |
-                         (p->color.g << 8) |
-                         (p->color.r);
+            if (p->active) {
+                row[x] = p->render_color;
             } else {
                 row[x] = 0x00000000;
             }
@@ -203,13 +201,7 @@ void handle_events() {
                         game.current_type = PARTICLE_WATER;
                         break;
                     case SDLK_C:
-                        for (int i = 0; i < SIM_WIDTH * SIM_HEIGHT; i++) {
-                            if (game.sim.grid[i]) {
-                                int y = i / SIM_WIDTH;
-                                int x = i % SIM_WIDTH;
-                                sim_remove_particle(&game.sim, x, y);
-                            }
-                        }
+                        sim_clear(&game.sim);
                         break;
                 }
                 break;

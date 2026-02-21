@@ -2,6 +2,7 @@
 #define PARTICLE_H_
 
 #include "color.h"
+#include <SDL3/SDL.h>
 #include <stdbool.h>
 
 typedef enum {
@@ -28,21 +29,18 @@ typedef struct {
 typedef struct {
     ParticleType type;
     Color color;
+    Uint32 render_color;
 
     float vx;
     float vy;
 
-    bool updated;
+    bool active;
+    int last_updated_tick;
 } Particle;
 
 const ParticleProperties* particles_get_properties(ParticleType type);
 
-Particle particle_create(ParticleType type);
-
-extern const Particle SAND_PARTICLE;
-extern const Particle WATER_PARTICLE;
-extern const Particle AIR_PARTICLE;
-
-void init_particles();
+void particles_init_colors();
+Uint32 particles_get_packed_color(ParticleType type);
 
 #endif
