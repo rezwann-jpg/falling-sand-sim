@@ -1,8 +1,5 @@
 #include "game.h"
 #include "common.h"
-#include "particle.h"
-#include "simulation.h"
-#include <SDL3/SDL_events.h>
 #include <math.h>
 #include <stdio.h>
 
@@ -77,6 +74,11 @@ bool init() {
         return false;
     }
 
+    if (!text_init(&game.text, game.renderer, "/usr/share/fonts/TTF/Hack-Regular.ttf", 16)) {
+        return false;
+    }
+
+    game.last_time = SDL_GetTicks();
     game.running = true;
 
     return true;
@@ -111,13 +113,7 @@ void update_texture() {
 
     for (int y = 0; y < SIM_HEIGHT; y++) {
         Uint32 *row = pixel_buffer + y * row_pixels;
-        for (int x = 0; x < SIM_WIDTH; x++) {
-            row[x] = 0x00000000;
-        }
-    }
 
-    for (int y = 0; y < SIM_HEIGHT; y++) {
-        Uint32 *row = pixel_buffer + y * row_pixels;
         for (int x = 0; x < SIM_WIDTH; x++) {
             Particle *p = game.sim.grid[y * SIM_WIDTH + x];
 
@@ -126,6 +122,8 @@ void update_texture() {
                          (p->color.b << 16) |
                          (p->color.g << 8) |
                          (p->color.r);
+            } else {
+                row[x] = 0x00000000;
             }
         }
     }
@@ -236,6 +234,14 @@ void update() {
     handle_input();
     sim_update(&game.sim);
     update_texture();
+
+    game.frame_count++;
+    Uint64 now = SDL_GetTicks();
+    if (now - game.last_time >= 1000) {
+        game.fps = (float)game.frame_count * 1000.0f / (now - game.last_time);
+        game.frame_count = 0;
+        game.last_time = now;
+    }
 }
 
 void draw() {
@@ -244,30 +250,27 @@ void draw() {
 
     render_texture();
 
+    char fps_str[32];
+    snprintf(fps_str, sizeof(fps_str), "FPS: %.0f", game.fps);
+    text_draw(&game.text, fps_str, 10, 10, (SDL_Color){255, 255, 255, 255});
+
     SDL_RenderPresent(game.renderer);
 }
 
 void run() {
-    Uint64 last_time = SDL_GetTicks();
-    const Uint64 FRAME_DELAY = 16;
+    const Uint64 target_ms = 16;
 
     while (game.running) {
-        Uint64 current_time = SDL_GetTicks();
-        Uint64 elapsed = current_time - last_time;
+        Uint64 start = SDL_GetTicks();
 
         handle_events();
-
-        if (elapsed >= FRAME_DELAY) {
-            update();
-            last_time = current_time;
-        }
-
+        update();
         draw();
 
-        Uint64 frame_time = SDL_GetTicks() - current_time;
-        if (frame_time < FRAME_DELAY) {
-            SDL_Delay((Uint32)(FRAME_DELAY - frame_time));
-        }
+        Uint64 frame_time = SDL_GetTicks() - start;
+
+        if (frame_time < target_ms)
+            SDL_Delay((Uint32)(target_ms - frame_time));
     }
 }
 
