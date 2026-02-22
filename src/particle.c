@@ -18,6 +18,12 @@ static const ParticleProperties PARTICLE_PROPERTIES[PARTICLE_COUNT] = {
         .state = STATE_LIQUID,
         .density = 1000.0f,
         .viscosity = 0.1f
+    },
+    {
+        .name = "Stone",
+        .state = STATE_SOLID,
+        .density = 2700.0f,
+        .viscosity = 0.0f
     }
 };
 
@@ -60,7 +66,8 @@ void particles_init_colors() {
     Color colors[PARTICLE_COUNT] = {
         COLOR_AIR,
         COLOR_SAND,
-        COLOR_WATER
+        COLOR_WATER,
+        COLOR_STONE
     };
 
     for (int i = 0; i < PARTICLE_COUNT; i++) {

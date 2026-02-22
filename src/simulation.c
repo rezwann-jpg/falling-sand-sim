@@ -1,5 +1,6 @@
 #include "simulation.h"
 #include "common.h"
+#include "particle.h"
 #include <stdlib.h>
 #include <time.h>
 
@@ -88,9 +89,9 @@ void sim_remove_particle(Simulation *sim, int x, int y) {
 }
 
 static bool can_displace(Particle *a, Particle* b) {
-    if (!a)
+    if (!a->active)
         return false;
-    if (!b)
+    if (!b->active)
         return true;
 
     const ParticleProperties *props_a = particles_get_properties(a->type);
@@ -181,16 +182,20 @@ static void update_liquid(Simulation *sim, int x, int y) {
 
     int dir = (rng_xorshift(sim) % 2) ? -1 : 1;
 
-    Particle *diag1 = &sim->grid[idx(x + dir, y + 1)];
-    if (can_displace(p, diag1)) {
-        swap_particles(sim, x, y, x + dir, y + 1);
-        return;
+    if (in_bounds(x + dir, y + 1)) {
+        Particle *diag1 = &sim->grid[idx(x + dir, y + 1)];
+        if (can_displace(p, diag1)) {
+            swap_particles(sim, x, y, x + dir, y + 1);
+            return;
+        }
     }
 
-    Particle *diag2 = &sim->grid[idx(x - dir, y + 1)];
-    if (can_displace(p, diag2)) {
-        swap_particles(sim, x, y, x - dir, y + 1);
-        return;
+    if (in_bounds(x - dir, y + 1)) {
+        Particle *diag2 = &sim->grid[idx(x - dir, y + 1)];
+        if (can_displace(p, diag2)) {
+            swap_particles(sim, x, y, x - dir, y + 1);
+            return;
+        }
     }
 
     int flow_distance = (int)(3.0f * (1.0f - props->viscosity)) + 1;
@@ -201,15 +206,16 @@ static void update_liquid(Simulation *sim, int x, int y) {
 
         for (int i = 1; i <= flow_distance; i++) {
             int nx = x + i * current_dir;
-            Particle *side = &sim->grid[idx(nx, y)];
 
             if (!in_bounds(nx, y)) break;
+
+            Particle *side = &sim->grid[idx(nx, y)];
 
             if (can_displace(p, side)) {
                 swap_particles(sim, x, y, nx, y);
                 p->vx = (float)current_dir;
                 return;
-            } else if (side) {
+            } else if (side->active) {
                 break;
             }
         }
@@ -217,6 +223,12 @@ static void update_liquid(Simulation *sim, int x, int y) {
 
     p->vy *= 0.3f;
     p->vx *= 0.9f;
+}
+
+static void update_solid(Simulation *sim, int x, int y) {
+    (void)sim;
+    (void)x;
+    (void)y;
 }
 
 // static void update_sand(Simulation *sim, int x, int y) {
@@ -286,6 +298,9 @@ void update_particle(Simulation *sim, int x, int y) {
             break;
         case STATE_LIQUID:
             update_liquid(sim, x, y);
+            break;
+        case STATE_SOLID:
+            update_solid(sim, x, y);
             break;
     }
 }

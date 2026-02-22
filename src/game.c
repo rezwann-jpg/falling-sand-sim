@@ -21,7 +21,7 @@ bool init() {
         "Falling Sand",
         game.width,
         game.height,
-        SDL_WINDOW_TRANSPARENT
+        0
     );
 
     if (!game.window) {
@@ -39,10 +39,10 @@ bool init() {
         return false;
     }
 
-    if (!SDL_SetWindowOpacity(game.window, 0.8f)) {
-        SDL_Log("Transparent Window: %s", SDL_GetError());
-        return false;
-    }
+    // if (!SDL_SetWindowOpacity(game.window, 0.8f)) {
+    //     SDL_Log("Transparent Window: %s", SDL_GetError());
+    //     return false;
+    // }
 
     game.texture =  SDL_CreateTexture(
         game.renderer,
@@ -199,6 +199,9 @@ void handle_events() {
                         break;
                     case SDLK_2:
                         game.current_type = PARTICLE_WATER;
+                        break;
+                    case SDLK_3:
+                        game.current_type = PARTICLE_STONE;
                         break;
                     case SDLK_C:
                         sim_clear(&game.sim);

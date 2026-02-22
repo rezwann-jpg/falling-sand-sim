@@ -16,6 +16,7 @@ typedef enum {
     PARTICLE_NONE = 0,
     PARTICLE_SAND,
     PARTICLE_WATER,
+    PARTICLE_STONE,
     PARTICLE_COUNT
 } ParticleType;
 
