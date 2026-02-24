@@ -1,6 +1,7 @@
 #include "game.h"
 #include "common.h"
 #include "simulation.h"
+#include "tui.h"
 #include <math.h>
 #include <stdio.h>
 
@@ -9,7 +10,8 @@ Game game = { 0 };
 bool init() {
     game.width = WINDOW_WIDTH;
     game.height = WINDOW_HEIGHT;
-    game.brush_size = 3;
+    game.tui.brush_size = 3;
+    game.tui.selected_idx = 0;
     game.current_type = PARTICLE_SAND;
 
     if (!SDL_Init(SDL_INIT_VIDEO)) {
@@ -76,6 +78,10 @@ bool init() {
     }
 
     if (!text_init(&game.text, game.renderer, "/usr/share/fonts/TTF/Hack-Regular.ttf", 16)) {
+        return false;
+    }
+
+    if (!tui_init()) {
         return false;
     }
 
@@ -187,26 +193,9 @@ void handle_events() {
                 break;
 
             case SDL_EVENT_MOUSE_WHEEL:
-                game.brush_size += (int)event.wheel.y;
-                if (game.brush_size < 1) game.brush_size = 1;
-                if (game.brush_size > 20) game.brush_size = 20;
-                break;
-
-            case SDL_EVENT_KEY_DOWN:
-                switch (event.key.key) {
-                    case SDLK_1:
-                        game.current_type = PARTICLE_SAND;
-                        break;
-                    case SDLK_2:
-                        game.current_type = PARTICLE_WATER;
-                        break;
-                    case SDLK_3:
-                        game.current_type = PARTICLE_STONE;
-                        break;
-                    case SDLK_C:
-                        sim_clear(&game.sim);
-                        break;
-                }
+                game.tui.brush_size += (int)event.wheel.y;
+                if (game.tui.brush_size < 1) game.tui.brush_size = 1;
+                if (game.tui.brush_size > 20) game.tui.brush_size = 20;
                 break;
         }
     }
@@ -215,19 +204,33 @@ void handle_events() {
 void handle_input() {
     int sim_x, sim_y;
     screen_to_sim(game.mouse_x, game.mouse_y, &sim_x, &sim_y);
+    game.current_type = tui_get_selected_type(&game.tui);
 
     if (game.mouse_left) {
-        sim_brush_cirlce(&game.sim, sim_x, sim_y, game.brush_size, game.current_type);
+        sim_brush_cirlce(&game.sim, sim_x, sim_y, game.tui.brush_size, game.current_type);
     }
 
     if (game.mouse_right) {
-        sim_brush_erase(&game.sim, sim_x, sim_y, game.brush_size);
+        sim_brush_erase(&game.sim, sim_x, sim_y, game.tui.brush_size);
     }
 }
 
 void update() {
+    tui_update(&game.tui);
+    if (game.tui.quit_requested) {
+        game.running = false;
+    }
+    if (game.tui.clear_requested) {
+        sim_clear(&game.sim);
+        game.tui.clear_requested = false;
+    }
+
     handle_input();
-    sim_update(&game.sim);
+
+    if (!game.tui.paused) {
+        sim_update(&game.sim);
+    }
+
     update_texture();
 
     game.frame_count++;
@@ -261,6 +264,7 @@ void run() {
         handle_events();
         update();
         draw();
+        tui_draw(&game.tui);
 
         Uint64 frame_time = SDL_GetTicks() - start;
 
@@ -270,6 +274,7 @@ void run() {
 }
 
 void cleanup() {
+    tui_cleanup();
     sim_cleanup(&game.sim);
     SDL_DestroyTexture(game.texture);
     SDL_DestroyRenderer(game.renderer);

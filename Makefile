@@ -17,8 +17,8 @@ CFLAGS       += -Wall -std=c11 -Iinclude
 LDFLAGS      := -lm
 
 ifneq ($(shell command -v pkg-config 2>/dev/null),)
-    SDL_CFLAGS  := $(shell pkg-config --cflags sdl3 sdl3-ttf 2>/dev/null)
-    SDL_LDFLAGS := $(shell pkg-config --libs sdl3 sdl3-ttf 2>/dev/null)
+    SDL_CFLAGS  := $(shell pkg-config --cflags sdl3 sdl3-ttf ncurses 2>/dev/null)
+    SDL_LDFLAGS := $(shell pkg-config --libs sdl3 sdl3-ttf ncurses 2>/dev/null)
 else ifneq ($(shell command -v sdl3-config 2>/dev/null),)
     SDL_CFLAGS  := $(shell sdl3-config --cflags)
     SDL_LDFLAGS := $(shell sdl3-config --libs)

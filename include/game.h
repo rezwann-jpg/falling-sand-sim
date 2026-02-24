@@ -5,12 +5,14 @@
 #include "particle.h"
 #include "simulation.h"
 #include "text.h"
+#include "tui.h"
 
 typedef struct {
     SDL_Window* window;
     SDL_Renderer* renderer;
     SDL_Texture* texture;
     TextRenderer text;
+    TuiState tui;
 
     bool running;
     int width;
@@ -22,7 +24,6 @@ typedef struct {
     int mouse_y;
     bool mouse_left;
     bool mouse_right;
-    int brush_size;
     ParticleType current_type;
 
     float fps;
