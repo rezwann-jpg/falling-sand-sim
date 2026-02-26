@@ -91,7 +91,6 @@ void sim_remove_particle(Simulation *sim, int x, int y) {
     sim->grid[idx(x, y)].vy = 0;
 }
 
-
 static void transform_particle(Simulation *sim, int x, int y, ParticleType new_type) {
     Particle *p = &sim->grid[idx(x, y)];
     if (!p->active) return;
@@ -106,11 +105,57 @@ static void transform_particle(Simulation *sim, int x, int y, ParticleType new_t
     p->temperature = old_temp;
 }
 
+static void update_temperature(Simulation *sim, int x, int y) {
+    Particle *p = &sim->grid[idx(x, y)];
+    if (!p) return;
+
+    const ParticleProperties *props = particles_get_properties(p->type);
+
+    int dx[] = {-1, 1, 0, 0};
+    int dy[] = {0, 0, -1, 1};
+
+    float total_transfer = 0.0f;
+    int neighbor_count = 0;
+
+    for (int i = 0; i < 4; i++) {
+        int nx = x + dx[i];
+        int ny = y + dy[i];
+        Particle *neighbor = &sim->grid[idx(nx, ny)];
+
+        float neighbor_temp = neighbor ? neighbor->temperature : AMBIENT_TEMP;
+        float diff = neighbor_temp - p->temperature;
+
+        float conductivity = props->thermal_conductivity;
+        if (neighbor) {
+            const ParticleProperties *n_props = particles_get_properties(neighbor->type);
+            conductivity = (conductivity + n_props->thermal_conductivity) * 0.5f;
+        }
+
+        total_transfer += diff * conductivity * TEMP_TRANSFER_RATE;
+        neighbor_count++;
+    }
+
+    if (neighbor_count > 0) {
+        p->temperature += total_transfer / neighbor_count;
+    }
+
+    // Slowly approach ambient temperature
+    p->temperature += (AMBIENT_TEMP - p->temperature) * 0.001f;
+}
+
+
 static void check_reactions(Simulation *sim, int x, int y) {
     Particle *p = &sim->grid[idx(x, y)];
     if (!p->active) return;
 
     const ParticleProperties *props = particles_get_properties(p->type);
+
+    if (props->boiling_point > 0 && p->temperature >= props->boiling_point) {
+        if (props->state == STATE_LIQUID) {
+            transform_particle(sim, x, y, props->boils_into);
+            return;
+        }
+    }
 
     if (props->flammability > 0 && props->ignition_point > 0) {
         if (p->temperature >= props->ignition_point || p->burning) {
@@ -456,6 +501,8 @@ void update_particle(Simulation *sim, int x, int y) {
         return;
 
     const ParticleProperties *props = particles_get_properties(p->type);
+
+    update_temperature(sim, x, y);
 
     check_reactions(sim, x, y);
 

@@ -31,11 +31,14 @@ typedef struct {
     float friction;
     float bounciness;
     float viscosity;
+    float boiling_point;
     float ignition_point;
+    float thermal_conductivity;
     float flammability;
     int lifetime;
     Color color_min;
     Color color_max;
+    ParticleType boils_into;
     ParticleType burns_into;
 } ParticleProperties;
 
@@ -53,8 +56,6 @@ typedef struct {
     int last_updated_tick;
     bool burning;
 } Particle;
-
-#define AMBIENT_TEMP 20.0f
 
 Particle particle_create(ParticleType type, unsigned int *rng_state);
 

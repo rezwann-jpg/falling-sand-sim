@@ -5,6 +5,8 @@
 #include <stdbool.h>
 
 #define GRAVITY 0.5f
+#define TEMP_TRANSFER_RATE 0.1f
+#define AMBIENT_TEMP 20.0f
 
 typedef struct {
     int width;

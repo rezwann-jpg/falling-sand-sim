@@ -27,9 +27,12 @@ static const ParticleProperties PARTICLE_PROPERTIES[PARTICLE_COUNT] = {
         .friction = 0.7f,
         .bounciness = 0.1f,
         .viscosity = 0.0f,
-        .ignition_point = 1,
+        .boiling_point = 2230.0f,
+        .ignition_point = -1.0f,
+        .thermal_conductivity = 0.25f,
         .flammability = 0.0f,
         .lifetime = -1,
+        .boils_into = PARTICLE_NONE,
         .burns_into = PARTICLE_NONE
     },
     {
@@ -39,9 +42,12 @@ static const ParticleProperties PARTICLE_PROPERTIES[PARTICLE_COUNT] = {
         .friction = 0.1f,
         .bounciness = 0.0f,
         .viscosity = 0.1f,
+        .boiling_point = 100.0f,
         .ignition_point = -1.0f,
+        .thermal_conductivity = 0.6f,
         .flammability = 0.0f,
         .lifetime = -1,
+        .boils_into = PARTICLE_STEAM,
         .burns_into = PARTICLE_NONE
     },
     {
@@ -51,9 +57,12 @@ static const ParticleProperties PARTICLE_PROPERTIES[PARTICLE_COUNT] = {
         .viscosity = 0.0f,
         .friction = 0.9f,
         .bounciness = 0.2f,
+        .boiling_point = 3000.0f,
         .ignition_point = -1.0f,
+        .thermal_conductivity = 1.7f,
         .flammability = 0.0f,
         .lifetime = -1,
+        .boils_into = PARTICLE_NONE,
         .burns_into = PARTICLE_NONE
     },
     {
@@ -63,9 +72,12 @@ static const ParticleProperties PARTICLE_PROPERTIES[PARTICLE_COUNT] = {
         .friction = 0.8f,
         .bounciness = 0.15f,
         .viscosity = 0.0f,
-        .ignition_point = 60.0f,
-        .flammability = 0.6f,
+        .boiling_point = -1.0f,
+        .ignition_point = 300.0f,
+        .thermal_conductivity = 0.15f,
+        .flammability = 0.8f,
         .lifetime = -1,
+        .boils_into = PARTICLE_NONE,
         .burns_into = PARTICLE_FIRE,
     },
     {
@@ -75,11 +87,14 @@ static const ParticleProperties PARTICLE_PROPERTIES[PARTICLE_COUNT] = {
         .friction = 0.0f,
         .bounciness = 0.0f,
         .viscosity = 0.1f,
+        .boiling_point = -1.0f,
         .ignition_point = -1.0f,
+        .thermal_conductivity = 0.05f,
         .flammability = 0.0f,
         .lifetime = 60,
         .color_min = COLOR_FIRE_MIN,
         .color_max = COLOR_FIRE,
+        .boils_into = PARTICLE_FIRE,
         .burns_into = PARTICLE_NONE
     },
     {
@@ -89,9 +104,12 @@ static const ParticleProperties PARTICLE_PROPERTIES[PARTICLE_COUNT] = {
         .friction = 0.0f,
         .bounciness = 0.0f,
         .viscosity = 0.05f,
+        .boiling_point = -1.0f,
         .ignition_point = -1.0f,
+        .thermal_conductivity = 0.02f,
         .flammability = 0.0f,
         .lifetime = 200,
+        .boils_into = PARTICLE_NONE,
         .burns_into = PARTICLE_NONE,
     },
     {
@@ -101,9 +119,12 @@ static const ParticleProperties PARTICLE_PROPERTIES[PARTICLE_COUNT] = {
         .friction = 0.0f,
         .bounciness = 0.0f,
         .viscosity = 0.02f,
+        .boiling_point = -1.0f,
         .ignition_point = -1.0f,
+        .thermal_conductivity = 0.02f,
         .flammability = 0.0f,
         .lifetime = 300,
+        .boils_into = PARTICLE_STEAM,
         .burns_into = PARTICLE_NONE,
     }
 };
@@ -137,7 +158,7 @@ Particle particle_create(ParticleType type, unsigned int *rng_state) {
     p.vy = 0;
     p.active = true;
     p.last_updated_tick = -1;
-    p.temperature = AMBIENT_TEMP;
+    p.temperature = 20.0f;
     p.lifetime = props->lifetime;
     p.burning = false;
 
