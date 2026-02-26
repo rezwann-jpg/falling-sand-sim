@@ -11,6 +11,8 @@ static const struct {
     {PARTICLE_SAND, "Sand", COLOR_YELLOW},
     {PARTICLE_WATER, "Water", COLOR_BLUE},
     {PARTICLE_STONE, "Stone", COLOR_WHITE},
+    {PARTICLE_WOOD, "Wood", COLOR_YELLOW},
+    {PARTICLE_FIRE, "Fire", COLOR_RED},
 };
 
 #define NUM_PARTICLES ((int)(sizeof(particles) / sizeof(particles[0])))

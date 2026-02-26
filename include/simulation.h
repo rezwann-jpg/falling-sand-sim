@@ -4,7 +4,7 @@
 #include "particle.h"
 #include <stdbool.h>
 
-#define GRAVITY 0.5f;
+#define GRAVITY 0.5f
 
 typedef struct {
     int width;

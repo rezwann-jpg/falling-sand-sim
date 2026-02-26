@@ -17,6 +17,10 @@ typedef enum {
     PARTICLE_SAND,
     PARTICLE_WATER,
     PARTICLE_STONE,
+    PARTICLE_WOOD,
+    PARTICLE_FIRE,
+    PARTICLE_SMOKE,
+    PARTICLE_STEAM,
     PARTICLE_COUNT
 } ParticleType;
 
@@ -24,7 +28,15 @@ typedef struct {
     const char *name;
     ParticleState state;
     float density;
+    float friction;
+    float bounciness;
     float viscosity;
+    float ignition_point;
+    float flammability;
+    int lifetime;
+    Color color_min;
+    Color color_max;
+    ParticleType burns_into;
 } ParticleProperties;
 
 typedef struct {
@@ -34,10 +46,17 @@ typedef struct {
 
     float vx;
     float vy;
+    float temperature;
+    int lifetime;
 
     bool active;
     int last_updated_tick;
+    bool burning;
 } Particle;
+
+#define AMBIENT_TEMP 20.0f
+
+Particle particle_create(ParticleType type, unsigned int *rng_state);
 
 const ParticleProperties* particles_get_properties(ParticleType type);
 
