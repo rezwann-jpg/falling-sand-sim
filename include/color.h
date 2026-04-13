@@ -23,6 +23,7 @@ typedef struct {
 #define COLOR_LAVA (Color){ 207, 16, 32, 240 }
 #define COLOR_ASH (Color){ 178, 190, 181, 240 }
 #define COLOR_ANT (Color){ 0, 0, 0, 255 }
+#define COLOR_FLOWER (Color){ 255, 105, 180, 255 }
 
 static inline Color color_lerp(Color a, Color b, float t) {
     Color result;

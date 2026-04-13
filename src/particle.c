@@ -145,9 +145,9 @@ static const ParticleProperties PARTICLE_PROPERTIES[PARTICLE_COUNT] = {
     {
         .name = "Seed",
         .state = STATE_POWDER,
-        .density = 1000.0f,
-        .friction = 0.6f,
-        .bounciness = 0.05f,
+        .density = 1200.0f,
+        .friction = 0.2f,
+        .bounciness = 0.3f,
         .viscosity = 0.0f,
         .boiling_point = -1.0f,
         .ignition_point = 250.0f,
@@ -216,6 +216,21 @@ static const ParticleProperties PARTICLE_PROPERTIES[PARTICLE_COUNT] = {
         .lifetime = 1000,
         .boils_into = PARTICLE_NONE,
         .burns_into = PARTICLE_FIRE,
+    },
+    {
+        .name = "Flower",
+        .state = STATE_SOLID,
+        .density = 800.0f,
+        .friction = 0.9f,
+        .bounciness = 0.0f,
+        .viscosity = 0.0f,
+        .boiling_point = -1.0f,
+        .ignition_point = 250.0f,
+        .thermal_conductivity = 0.1f,
+        .flammability = 0.7f,
+        .lifetime = -1,
+        .boils_into = PARTICLE_NONE,
+        .burns_into = PARTICLE_FIRE,
     }
 };
 
@@ -279,7 +294,8 @@ void particles_init_colors() {
         COLOR_WET_SAND,
         COLOR_LAVA,
         COLOR_ASH,
-        COLOR_ANT
+        COLOR_ANT,
+        COLOR_FLOWER
     };
 
     for (int i = 0; i < PARTICLE_COUNT; i++) {

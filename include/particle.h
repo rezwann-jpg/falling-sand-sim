@@ -27,6 +27,7 @@ typedef enum {
     PARTICLE_LAVA,
     PARTICLE_ASH,
     PARTICLE_ANT,
+    PARTICLE_FLOWER,
     PARTICLE_COUNT
 } ParticleType;
 

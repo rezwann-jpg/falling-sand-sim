@@ -63,8 +63,11 @@ static void swap_particles(Simulation *sim, int x1, int y1, int x2, int y2) {
 
     sim->grid_current[idx1].handled = true;
     sim->grid_current[idx2].handled = true;
-    sim->grid_next[idx1].handled = true;
-    sim->grid_next[idx2].handled = true;
+    
+    if (sim->grid_next[idx1].type != PARTICLE_NONE)
+        sim->grid_next[idx1].handled = true;
+    if (sim->grid_next[idx2].type != PARTICLE_NONE)
+        sim->grid_next[idx2].handled = true;
 }
 
 bool sim_spawn_particles(Simulation *sim, int x, int y, ParticleType type) {
@@ -140,6 +143,53 @@ static void update_temperature(Simulation *sim, int x, int y) {
     }
 
     next->temperature += (AMBIENT_TEMP - next->temperature) * 0.001f;
+}
+static void grow_plant_session(Simulation *sim, int root_x, int root_y, int energy) {
+    int cx = root_x;
+    int cy = root_y;
+    
+    while(energy > 0) {
+        int dx = 0;
+        int dy = -1;
+        float r = rng_float(sim);
+        if (r < 0.1f) dx = -1;
+        else if (r < 0.2f) dx = 1;
+        
+        cx += dx;
+        cy += dy;
+        
+        if (!in_bounds(cx, cy)) break;
+        
+        ParticleType pt = sim->grid_current[idx(cx, cy)].type;
+        
+        if (pt == PARTICLE_NONE) {
+            bool flower = (energy == 1 || rng_float(sim) < 0.05f);
+            if (flower) {
+                for(int fd=-1; fd<=1; fd++) {
+                    for(int fx=-1; fx<=1; fx++) {
+                        if (fx*fx + fd*fd > 1) continue;
+                        int fnx = cx + fx;
+                        int fny = cy + fd;
+                        if (in_bounds(fnx, fny) && is_empty_current(sim, fnx, fny) && !sim->grid_current[idx(fnx, fny)].handled) {
+                            sim->grid_current[idx(fnx, fny)] = particle_create(PARTICLE_FLOWER, &sim->rng_state);
+                            sim->grid_next[idx(fnx, fny)] = sim->grid_current[idx(fnx, fny)];
+                        }
+                    }
+                }
+                break;
+            } else {
+                sim->grid_current[idx(cx, cy)] = particle_create(PARTICLE_PLANT, &sim->rng_state);
+                sim->grid_next[idx(cx, cy)] = sim->grid_current[idx(cx, cy)];
+                energy--;
+            }
+        } else if (pt == PARTICLE_PLANT || pt == PARTICLE_FLOWER) {
+            continue;
+        } else {
+            if (is_empty_current(sim, cx - 1, cy)) cx--;
+            else if (is_empty_current(sim, cx + 1, cy)) cx++;
+            else break;
+        }
+    }
 }
 
 static void check_reactions(Simulation *sim, int x, int y) {
@@ -219,13 +269,67 @@ static void check_reactions(Simulation *sim, int x, int y) {
                     return;
                 } else if (neighbor->type == PARTICLE_SAND) {
                     // Water + Sand -> Wet Sand + Empty (water absorbed)
-                    sim->grid_next[idx(nx, ny)] = particle_create(PARTICLE_WET_SAND, &sim->rng_state);
-                    sim->grid_current[idx(nx, ny)].handled = true;
+                    if (dy[i] == 1 || rng_float(sim) < 0.05f) {
+                        sim->grid_next[idx(nx, ny)] = particle_create(PARTICLE_WET_SAND, &sim->rng_state);
+                        sim->grid_current[idx(nx, ny)].handled = true;
+                        transform_particle(sim, x, y, PARTICLE_NONE);
+                        return;
+                    }
+                } else if (neighbor->type == PARTICLE_PLANT) {
                     transform_particle(sim, x, y, PARTICLE_NONE);
+                    grow_plant_session(sim, nx, ny, 3);
                     return;
                 }
                 sim->grid_next[idx(nx, ny)].burning = false;
             }
+        }
+    }
+
+    if (curr->type == PARTICLE_WET_SAND) {
+        int dx[] = {-1, 1, 0, 0};
+        int dy[] = {0, 0, -1, 1};
+        for (int i = 0; i < 4; i++) {
+            int nx = x + dx[i];
+            int ny = y + dy[i];
+            if (!in_bounds(nx, ny)) continue;
+            Particle *neighbor = &sim->grid_current[idx(nx, ny)];
+            if (neighbor->active && neighbor->type == PARTICLE_PLANT) {
+                if (rng_float(sim) < 0.05f) {
+                    transform_particle(sim, x, y, PARTICLE_SAND);
+                    grow_plant_session(sim, nx, ny, 2);
+                    return;
+                }
+            }
+        }
+    }
+
+    if (curr->type == PARTICLE_SEED) {
+        bool has_water = false;
+        bool has_soil = false;
+        bool touches_plant = false;
+        int dx[] = {-1, 1, 0, 0, -1, 1, -1, 1};
+        int dy[] = {0, 0, -1, 1, -1, -1, 1, 1};
+        for(int i=0; i<8; i++) {
+            int nx = x+dx[i];
+            int ny = y+dy[i];
+            if (in_bounds(nx, ny)) {
+                ParticleType pt = sim->grid_current[idx(nx, ny)].type;
+                if (pt == PARTICLE_WATER) has_water = true;
+                if (pt == PARTICLE_SAND) has_soil = true;
+                if (pt == PARTICLE_WET_SAND) {
+                    has_water = true;
+                    has_soil = true;
+                }
+                if (pt == PARTICLE_PLANT || pt == PARTICLE_FLOWER) touches_plant = true;
+            }
+        }
+        if (has_water && has_soil && rng_float(sim) < 0.05f) {
+            transform_particle(sim, x, y, PARTICLE_PLANT);
+            grow_plant_session(sim, x, y, 5);
+            return;
+        } else if (touches_plant) {
+            transform_particle(sim, x, y, PARTICLE_PLANT);
+            return;
         }
     }
 }
@@ -262,6 +366,11 @@ static void update_lifetime(Simulation *sim, int x, int y) {
 }
 
 static bool can_displace(Simulation *sim, int nx, int ny, Particle *a, Particle* b_curr) {
+    if (sim->grid_next[idx(nx, ny)].type == PARTICLE_NONE) {
+        if (sim->grid_next[idx(nx, ny)].handled) return false;
+        return true;
+    }
+    
     if (sim->grid_current[idx(nx, ny)].handled) return false;
     
     if (!a->active) return false;
@@ -475,39 +584,7 @@ static void update_solid(Simulation *sim, int x, int y) {
     Particle *curr = &sim->grid_current[idx(x, y)];
     Particle *next = &sim->grid_next[idx(x, y)];
 
-    if (curr->type == PARTICLE_PLANT) {
-        if (rng_float(sim) < 0.05f) { // Growth chance
-            int dx[] = {-1, 1, 0, 0, -1, 1, -1, 1};
-            int dy[] = {0, 0, -1, 1, -1, -1, 1, 1};
-            bool near_water = false;
-            for(int i=0; i<8; i++) {
-                int nx = x + dx[i];
-                int ny = y + dy[i];
-                if (in_bounds(nx, ny) && sim->grid_current[idx(nx, ny)].type == PARTICLE_WATER) {
-                    near_water = true;
-                    if (!sim->grid_current[idx(nx, ny)].handled) {
-                        sim->grid_next[idx(nx, ny)].active = false;
-                        sim->grid_next[idx(nx, ny)].type = PARTICLE_NONE;
-                        sim->grid_current[idx(nx, ny)].handled = true;
-                    }
-                    break;
-                }
-            }
-            if (near_water) {
-                int gdx[] = {-1, 0, 1, -1, 1};
-                int gdy[] = {-1, -1, -1, 0, 0};
-                for(int i=0; i<5; i++) {
-                    int nx = x + gdx[i];
-                    int ny = y + gdy[i];
-                    if (in_bounds(nx, ny) && is_empty_current(sim, nx, ny) && !sim->grid_current[idx(nx, ny)].handled) {
-                        sim->grid_next[idx(nx, ny)] = particle_create(PARTICLE_PLANT, &sim->rng_state);
-                        sim->grid_current[idx(nx, ny)].handled = true;
-                        break;
-                    }
-                }
-            }
-        }
-        
+    if (curr->type == PARTICLE_PLANT || curr->type == PARTICLE_FLOWER) {
         if (rng_float(sim) < 0.001f) { // Seed drop
             int nx = x;
             int ny = y - 1; // Drop seed from upwards, or drop seed left/right
@@ -520,8 +597,7 @@ static void update_solid(Simulation *sim, int x, int y) {
                 sim->grid_current[idx(nx, ny)].handled = true;
             }
         }
-    } 
-    else if (curr->type == PARTICLE_ANT) {
+    } else if (curr->type == PARTICLE_ANT) {
         if (in_bounds(x, y+1) && sim->grid_current[idx(x, y+1)].active) {
             int dir = (next->vx > 0) ? 1 : -1;
             if (next->vx == 0) dir = (rng_xorshift(sim) % 2) ? 1 : -1;
@@ -543,21 +619,6 @@ static void update_solid(Simulation *sim, int x, int y) {
             if (can_displace(sim, x, y+1, next, below)) {
                 swap_particles(sim, x, y, x, y+1);
             }
-        }
-    } else if (curr->type == PARTICLE_SEED) {
-        // Seeds can germinate if they touch water
-        bool wet = false;
-        int dx[] = {-1, 1, 0, 0};
-        int dy[] = {0, 0, -1, 1};
-        for(int i=0; i<4; i++) {
-            int nx = x+dx[i];
-            int ny = y+dy[i];
-            if (in_bounds(nx, ny) && (sim->grid_current[idx(nx, ny)].type == PARTICLE_WATER || sim->grid_current[idx(nx, ny)].type == PARTICLE_WET_SAND)) {
-                wet = true; break;
-            }
-        }
-        if (wet && rng_float(sim) < 0.1f) {
-            transform_particle(sim, x, y, PARTICLE_PLANT);
         }
     }
 }
@@ -632,6 +693,7 @@ void sim_brush_cirlce(Simulation *sim, int cx, int cy, int radius, ParticleType 
     for (int dy = -radius; dy <= radius; dy++) {
         for (int dx = -radius; dx <= radius; dx++) {
             if (dx * dx + dy * dy > r2) continue;
+            if (type == PARTICLE_SEED && rng_float(sim) > 0.05f) continue;
             sim_spawn_particles(sim, cx + dx, cy + dy, type);
         }
     }
