@@ -13,6 +13,12 @@ static const struct {
     {PARTICLE_STONE, "Stone", COLOR_WHITE},
     {PARTICLE_WOOD, "Wood", COLOR_YELLOW},
     {PARTICLE_FIRE, "Fire", COLOR_RED},
+    {PARTICLE_PLANT, "Plant", COLOR_GREEN},
+    {PARTICLE_SEED, "Seed", COLOR_YELLOW},
+    {PARTICLE_WET_SAND, "Wet Sand", COLOR_YELLOW},
+    {PARTICLE_LAVA, "Lava", COLOR_RED},
+    {PARTICLE_ASH, "Ash", COLOR_WHITE},
+    {PARTICLE_ANT, "Ant", COLOR_CYAN},
 };
 
 #define NUM_PARTICLES ((int)(sizeof(particles) / sizeof(particles[0])))
@@ -36,7 +42,7 @@ bool tui_init(void) {
         init_pair(6, COLOR_GREEN, -1);
     }
 
-    win = newwin(20, 26, 0, 0);
+    win = newwin(25, 26, 0, 0);
     keypad(win, TRUE);
     nodelay(win, TRUE);
 

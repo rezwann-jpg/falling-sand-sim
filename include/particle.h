@@ -21,6 +21,12 @@ typedef enum {
     PARTICLE_FIRE,
     PARTICLE_SMOKE,
     PARTICLE_STEAM,
+    PARTICLE_PLANT,
+    PARTICLE_SEED,
+    PARTICLE_WET_SAND,
+    PARTICLE_LAVA,
+    PARTICLE_ASH,
+    PARTICLE_ANT,
     PARTICLE_COUNT
 } ParticleType;
 
@@ -53,7 +59,7 @@ typedef struct {
     int lifetime;
 
     bool active;
-    int last_updated_tick;
+    bool handled;
     bool burning;
 } Particle;
 

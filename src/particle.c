@@ -126,6 +126,96 @@ static const ParticleProperties PARTICLE_PROPERTIES[PARTICLE_COUNT] = {
         .lifetime = 300,
         .boils_into = PARTICLE_STEAM,
         .burns_into = PARTICLE_NONE,
+    },
+    {
+        .name = "Plant",
+        .state = STATE_SOLID,
+        .density = 800.0f,
+        .friction = 0.9f,
+        .bounciness = 0.0f,
+        .viscosity = 0.0f,
+        .boiling_point = -1.0f,
+        .ignition_point = 250.0f,
+        .thermal_conductivity = 0.1f,
+        .flammability = 0.7f,
+        .lifetime = -1,
+        .boils_into = PARTICLE_NONE,
+        .burns_into = PARTICLE_FIRE,
+    },
+    {
+        .name = "Seed",
+        .state = STATE_POWDER,
+        .density = 1000.0f,
+        .friction = 0.6f,
+        .bounciness = 0.05f,
+        .viscosity = 0.0f,
+        .boiling_point = -1.0f,
+        .ignition_point = 250.0f,
+        .thermal_conductivity = 0.1f,
+        .flammability = 0.5f,
+        .lifetime = -1,
+        .boils_into = PARTICLE_NONE,
+        .burns_into = PARTICLE_FIRE,
+    },
+    {
+        .name = "Wet Sand",
+        .state = STATE_POWDER,
+        .density = 1800.0f,
+        .friction = 0.9f,
+        .bounciness = 0.0f,
+        .viscosity = 0.0f,
+        .boiling_point = -1.0f,
+        .ignition_point = -1.0f,
+        .thermal_conductivity = 0.3f,
+        .flammability = 0.0f,
+        .lifetime = -1,
+        .boils_into = PARTICLE_NONE,
+        .burns_into = PARTICLE_NONE,
+    },
+    {
+        .name = "Lava",
+        .state = STATE_LIQUID,
+        .density = 2500.0f,
+        .friction = 0.2f,
+        .bounciness = 0.0f,
+        .viscosity = 0.8f,
+        .boiling_point = -1.0f,
+        .ignition_point = -1.0f,
+        .thermal_conductivity = 1.0f,
+        .flammability = 0.0f,
+        .lifetime = -1,
+        .boils_into = PARTICLE_NONE,
+        .burns_into = PARTICLE_NONE,
+    },
+    {
+        .name = "Ash",
+        .state = STATE_POWDER,
+        .density = 400.0f,
+        .friction = 0.6f,
+        .bounciness = 0.0f,
+        .viscosity = 0.0f,
+        .boiling_point = -1.0f,
+        .ignition_point = -1.0f,
+        .thermal_conductivity = 0.05f,
+        .flammability = 0.0f,
+        .lifetime = -1,
+        .boils_into = PARTICLE_NONE,
+        .burns_into = PARTICLE_NONE,
+    },
+    {
+        .name = "Ant",
+        .state = STATE_SOLID, // Moves laterally via custom logic
+        .density = 1000.0f,
+        .friction = 0.0f,
+        .bounciness = 0.0f,
+        .viscosity = 0.0f,
+        .boiling_point = -1.0f,
+        .ignition_point = 100.0f,
+        .thermal_conductivity = 0.1f,
+        .flammability = 0.5f,
+        .lifetime = 1000,
+        .boils_into = PARTICLE_NONE,
+        .burns_into = PARTICLE_FIRE,
     }
 };
 
@@ -157,7 +247,6 @@ Particle particle_create(ParticleType type, unsigned int *rng_state) {
     p.vx = 0;
     p.vy = 0;
     p.active = true;
-    p.last_updated_tick = -1;
     p.temperature = 20.0f;
     p.lifetime = props->lifetime;
     p.burning = false;
@@ -166,6 +255,8 @@ Particle particle_create(ParticleType type, unsigned int *rng_state) {
 
     if (type == PARTICLE_FIRE) {
         p.temperature = 600.0f + rng_float(rng_state) * 400.0f;
+    } else if (type == PARTICLE_LAVA) {
+        p.temperature = 1200.0f;
     }
 
     return p;
@@ -182,7 +273,13 @@ void particles_init_colors() {
         COLOR_WOOD,
         COLOR_FIRE,
         COLOR_SMOKE,
-        COLOR_STEAM
+        COLOR_STEAM,
+        COLOR_PLANT,
+        COLOR_SEED,
+        COLOR_WET_SAND,
+        COLOR_LAVA,
+        COLOR_ASH,
+        COLOR_ANT
     };
 
     for (int i = 0; i < PARTICLE_COUNT; i++) {

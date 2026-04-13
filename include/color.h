@@ -17,8 +17,14 @@ typedef struct {
 #define COLOR_FIRE_MIN (Color){ 185, 58, 50, 255 }
 #define COLOR_SMOKE (Color){ 126, 126, 126, 255 }
 #define COLOR_STEAM (Color){ 230, 232, 229, 255 }
+#define COLOR_PLANT (Color){ 34, 139, 34, 255 }
+#define COLOR_SEED (Color){ 139, 69, 19, 255 }
+#define COLOR_WET_SAND (Color){ 186, 154, 110, 255 }
+#define COLOR_LAVA (Color){ 207, 16, 32, 240 }
+#define COLOR_ASH (Color){ 178, 190, 181, 240 }
+#define COLOR_ANT (Color){ 0, 0, 0, 255 }
 
-static Color color_lerp(Color a, Color b, float t) {
+static inline Color color_lerp(Color a, Color b, float t) {
     Color result;
 
     result.r = (unsigned int)(a.r + (b.r - a.r) * t);
