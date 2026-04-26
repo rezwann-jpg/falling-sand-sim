@@ -24,7 +24,13 @@ typedef struct {
 #define COLOR_ASH (Color){ 178, 190, 181, 240 }
 #define COLOR_ANT (Color){ 0, 0, 0, 255 }
 #define COLOR_FLOWER (Color){ 255, 105, 180, 255 }
-
+#define COLOR_SPORE (Color){ 163, 168, 64, 255 }
+#define COLOR_SPORELING_1 (Color){ 57, 255, 20, 255 }
+#define COLOR_SPORELING_2 (Color){ 173, 255, 47, 255 }
+#define COLOR_DEBRIS (Color){ 101, 67, 33, 255 }
+#define COLOR_DPL_A (Color){ 255, 50, 50, 255 }
+#define COLOR_DPL_B (Color){ 50, 255, 50, 255 }
+#define COLOR_DPL_C (Color){ 50, 100, 255, 255 }
 static inline Color color_lerp(Color a, Color b, float t) {
     Color result;
 
