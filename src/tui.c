@@ -13,6 +13,13 @@ static const struct {
     {PARTICLE_STONE, "Stone", COLOR_WHITE},
     {PARTICLE_WOOD, "Wood", COLOR_YELLOW},
     {PARTICLE_FIRE, "Fire", COLOR_RED},
+    {PARTICLE_PLANT, "Plant", COLOR_GREEN},
+    {PARTICLE_SEED, "Seed", COLOR_YELLOW},
+    {PARTICLE_WET_SAND, "Wet Sand", COLOR_YELLOW},
+    {PARTICLE_LAVA, "Lava", COLOR_RED},
+    {PARTICLE_ASH, "Ash", COLOR_WHITE},
+    {PARTICLE_ANT, "Ant", COLOR_CYAN},
+    {PARTICLE_FLOWER, "Flower", COLOR_MAGENTA},
 };
 
 #define NUM_PARTICLES ((int)(sizeof(particles) / sizeof(particles[0])))
@@ -34,9 +41,10 @@ bool tui_init(void) {
         init_pair(4, COLOR_RED, -1);
         init_pair(5, COLOR_CYAN, -1);
         init_pair(6, COLOR_GREEN, -1);
+        init_pair(7, COLOR_MAGENTA, -1);
     }
 
-    win = newwin(20, 26, 0, 0);
+    win = newwin(25, 26, 0, 0);
     keypad(win, TRUE);
     nodelay(win, TRUE);
 
@@ -56,6 +64,7 @@ static int color_to_pair(int color) {
         case COLOR_RED:    return 4;
         case COLOR_CYAN:   return 5;
         case COLOR_GREEN:  return 6;
+        case COLOR_MAGENTA:return 7;
         default:           return 3;
     }
 }

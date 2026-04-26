@@ -122,7 +122,7 @@ void update_texture() {
         Uint32 *row = pixel_buffer + y * row_pixels;
 
         for (int x = 0; x < SIM_WIDTH; x++) {
-            Particle *p = &game.sim.grid[y * SIM_WIDTH + x];
+            Particle *p = &game.sim.grid_current[y * SIM_WIDTH + x];
 
             if (p->active) {
                 row[x] = p->render_color;

@@ -1,0 +1,636 @@
+#include "simulation.h"
+#include "common.h"
+#include "color.h"
+#include <stdint.h>
+#include <stdlib.h>
+#include <time.h>
+
+static unsigned int rng_xorshift(Simulation *sim) {
+    sim->rng_state ^= sim->rng_state << 13;
+    sim->rng_state ^= sim->rng_state >> 17;
+    sim->rng_state ^= sim->rng_state << 5;
+    return sim->rng_state;
+}
+
+static float rng_float(Simulation *sim) {
+    return (float)rng_xorshift(sim) / (float)UINT32_MAX;
+}
+
+bool sim_init(Simulation *sim) {
+    sim->width = SIM_WIDTH;
+    sim->height = SIM_HEIGHT;
+    sim->rng_state = (unsigned int)time(NULL);
+    sim->current_tick = 0;
+
+    particles_init_colors();
+
+    sim->grid = calloc(SIM_WIDTH * SIM_HEIGHT, sizeof(Particle));
+    if (!sim->grid) {
+        return false;
+    }
+
+    return true;
+}
+
+void sim_cleanup(Simulation *sim) {
+    free(sim->grid);
+    sim->grid = NULL;
+}
+
+static inline int idx(int x, int y) {
+    return y * SIM_WIDTH + x;
+}
+
+static inline bool in_bounds(int x, int y) {
+    return x >= 0 && x < SIM_WIDTH && y >= 0 && y < SIM_HEIGHT;
+}
+
+static bool is_empty(Simulation *sim, int x, int y) {
+    return in_bounds(x, y) && !sim->grid[idx(x, y)].active;
+}
+
+// static inline Particle* get_particle(Simulation *sim, int x, int y) {
+//     if (!in_bounds(x, y))
+//         return NULL;
+//     return sim->grid[get_grid_idx(x, y)];
+// }
+
+// static inline void set_particle(Simulation *sim, int x, int y, Particle *p) {
+//     if (!in_bounds(x, y))
+//         return;
+//     sim->grid[get_grid_idx(x, y)] = p;
+// }
+
+static void swap_particles(Simulation *sim, int x1, int y1, int x2, int y2) {
+    int idx1 = idx(x1, y1);
+    int idx2 = idx(x2, y2);
+
+    Particle temp = sim->grid[idx1];
+    sim->grid[idx1] = sim->grid[idx2];
+    sim->grid[idx2] = temp;
+}
+
+bool sim_spawn_particles(Simulation *sim, int x, int y, ParticleType type) {
+    if (!in_bounds(x, y))
+           return false;
+
+    Particle *p = &sim->grid[idx(x,y)];
+    if (p->active)
+        return false;
+
+    *p = particle_create(type, &sim->rng_state);
+
+    return true;
+}
+
+void sim_remove_particle(Simulation *sim, int x, int y) {
+    if (!in_bounds(x,y)) return;
+    sim->grid[idx(x,y)].active = false;
+    sim->grid[idx(x, y)].type = PARTICLE_NONE;
+    sim->grid[idx(x, y)].vx = 0;
+    sim->grid[idx(x, y)].vy = 0;
+}
+
+static void transform_particle(Simulation *sim, int x, int y, ParticleType new_type) {
+    Particle *p = &sim->grid[idx(x, y)];
+    if (!p->active) return;
+
+    if (new_type == PARTICLE_NONE) {
+        sim_remove_particle(sim, x, y);
+        return;
+    }
+
+    float old_temp = p->temperature;
+    *p = particle_create(new_type, &sim->rng_state);
+    p->temperature = old_temp;
+}
+
+static void update_temperature(Simulation *sim, int x, int y) {
+    Particle *p = &sim->grid[idx(x, y)];
+    if (!p) return;
+
+    const ParticleProperties *props = particles_get_properties(p->type);
+
+    int dx[] = {-1, 1, 0, 0};
+    int dy[] = {0, 0, -1, 1};
+
+    float total_transfer = 0.0f;
+    int neighbor_count = 0;
+
+    for (int i = 0; i < 4; i++) {
+        int nx = x + dx[i];
+        int ny = y + dy[i];
+        Particle *neighbor = &sim->grid[idx(nx, ny)];
+
+        float neighbor_temp = neighbor ? neighbor->temperature : AMBIENT_TEMP;
+        float diff = neighbor_temp - p->temperature;
+
+        float conductivity = props->thermal_conductivity;
+        if (neighbor) {
+            const ParticleProperties *n_props = particles_get_properties(neighbor->type);
+            conductivity = (conductivity + n_props->thermal_conductivity) * 0.5f;
+        }
+
+        total_transfer += diff * conductivity * TEMP_TRANSFER_RATE;
+        neighbor_count++;
+    }
+
+    if (neighbor_count > 0) {
+        p->temperature += total_transfer / neighbor_count;
+    }
+
+    p->temperature += (AMBIENT_TEMP - p->temperature) * 0.001f;
+}
+
+
+static void check_reactions(Simulation *sim, int x, int y) {
+    Particle *p = &sim->grid[idx(x, y)];
+    if (!p->active) return;
+
+    const ParticleProperties *props = particles_get_properties(p->type);
+
+    if (props->boiling_point > 0 && p->temperature >= props->boiling_point) {
+        if (props->state == STATE_LIQUID) {
+            transform_particle(sim, x, y, props->boils_into);
+            return;
+        }
+    }
+
+    if (props->flammability > 0 && props->ignition_point > 0) {
+        if (p->temperature >= props->ignition_point || p->burning) {
+            p->burning = true;
+            p->temperature += 10.0f * props->flammability;
+
+            if (rng_float(sim) < props->flammability * 0.1f) {
+                if (is_empty(sim, x, y - 1) && rng_float(sim) < 0.3f) {
+                    sim_spawn_particles(sim, x, y - 1, PARTICLE_SMOKE);
+                }
+                transform_particle(sim, x, y, props->burns_into);
+                return;
+            }
+        }
+    }
+
+    if (p->type == PARTICLE_FIRE) {
+        int dx[] = {-1, 1, 0, 0, -1, 1, -1, 1};
+        int dy[] = {0, 0, -1, 1, -1, -1, 1, 1};
+
+        for (int i = 0; i < 8; i++) {
+            int nx = x + dx[i];
+            int ny = y + dy[i];
+
+            if (!in_bounds(nx, ny))
+                continue;
+
+            Particle *neighbor = &sim->grid[idx(nx, ny)];
+
+            if (neighbor) {
+                const ParticleProperties *n_props = particles_get_properties(neighbor->type);
+                neighbor->temperature += 20.0f;
+
+                if (n_props->flammability > 0 && rng_float(sim) < n_props->flammability * 0.05f) {
+                    neighbor->burning = true;
+                }
+            }
+        }
+    }
+
+    if (p->type == PARTICLE_WATER) {
+        int dx[] = {-1, 1, 0, 0};
+        int dy[] = {0, 0, -1, 1};
+
+        for (int i = 0; i < 4; i++) {
+            int nx = x + dx[i];
+            int ny = y + dy[i];
+            Particle *neighbor = &sim->grid[idx(nx, ny)];
+
+            if (neighbor) {
+                if (neighbor->type == PARTICLE_FIRE) {
+                    sim_remove_particle(sim, nx, ny);
+                    transform_particle(sim, x, y, PARTICLE_STEAM);
+                    return;
+                }
+                neighbor->burning = false;
+            }
+        }
+    }
+}
+
+static void update_lifetime(Simulation *sim, int x, int y) {
+    Particle *p = &sim->grid[idx(x, y)];
+    if (!p || p->lifetime < 0) return;
+
+    p->lifetime--;
+
+    if (p->lifetime <= 0) {
+        if (p->type == PARTICLE_FIRE) {
+            if (rng_xorshift(sim) < 0.5f) {
+                transform_particle(sim, x, y, PARTICLE_SMOKE);
+                return;
+            }
+        }
+        sim_remove_particle(sim, x, y);
+    }
+
+    if (p && p->type == PARTICLE_FIRE) {
+        const ParticleProperties *props = particles_get_properties(PARTICLE_FIRE);
+        float life_ratio = (float)p->lifetime / (float)props->lifetime;
+        p->color = color_lerp(props->color_min, props->color_max, life_ratio);
+        p->color.a = (unsigned int)(150 + 105 * life_ratio);
+        p->render_color = (p->color.a << 24) |
+                            (p->color.b << 16) |
+                            (p->color.g << 8)  |
+                            (p->color.r);
+    }
+}
+
+static bool can_displace(Particle *a, Particle* b) {
+    if (!a->active)
+        return false;
+    if (!b->active)
+        return true;
+
+    const ParticleProperties *props_a = particles_get_properties(a->type);
+    const ParticleProperties *props_b = particles_get_properties(b->type);
+
+    if (props_b->state == STATE_SOLID)
+        return false;
+
+    return props_a->density > props_b->density;
+}
+
+static void update_powder(Simulation *sim, int x, int y) {
+    Particle *p = &sim->grid[idx(x, y)];
+
+    if (!p)
+        return;
+
+    const ParticleProperties *props = particles_get_properties(p->type);
+
+    p->vy += GRAVITY;
+
+    p->vx *= (1.0f - props->friction * 0.1f);
+    p->vy *= 0.99f;
+
+    if (p->vy > 8.0f)
+        p->vy = 8.0f;
+    if (p->vx > 4.0f)
+        p->vx = 4.0f;
+    if (p->vx < -4.0f)
+        p->vx = -4.0f;
+
+    int move_y = (int)p->vy;
+    if (move_y < 1) move_y = 1;
+
+    for (int i = move_y; i >= 1; i--) {
+        if (in_bounds(x, y + i)) {
+            Particle *below = &sim->grid[idx(x, y + i)];
+            if (can_displace(p, below)) {
+                swap_particles(sim, x, y, x, y + i);
+                return;
+            }
+            else if (below->active) {
+                p->vy *= -props->bounciness;
+                break;
+            }
+        }
+    }
+
+    int dir = (rng_xorshift(sim) % 2) ? -1 : 1;
+
+    if (in_bounds(x + dir, y + 1)) {
+        Particle *diag = &sim->grid[idx(x + dir, y + 1)];
+        if (can_displace(p, diag)) {
+            swap_particles(sim, x, y, x + dir, y + 1);
+            p->vx = (float)dir * 0.5f;
+            return;
+        }
+    }
+
+    if (in_bounds(x - dir, y + 1)) {
+        Particle *diag = &sim->grid[idx(x - dir, y + 1)];
+        if (can_displace(p, diag)) {
+            swap_particles(sim, x, y, x - dir, y + 1);
+            p->vx = (float)(-dir) * 0.5f;
+            return;
+        }
+    }
+
+    p->vy = 0;
+}
+
+static void update_liquid(Simulation *sim, int x, int y) {
+    if (!in_bounds(x, y)) return;
+
+    Particle *p = &sim->grid[idx(x, y)];
+    if (!p->active) return;
+
+    const ParticleProperties *props = particles_get_properties(p->type);
+    if (!props) return;
+
+    p->vy += GRAVITY;
+
+    float viscosity_factor = 1.0f - props->viscosity * 0.3f;
+    p->vx *= viscosity_factor;
+    p->vy *= viscosity_factor;
+
+    if (p->vy > 6.0f) p->vy = 6.0f;
+    if (p->vx > 3.0f) p->vx = 3.0f;
+    if (p->vx < -3.0f) p->vx = -3.0f;
+
+    int move_y = (int)p->vy;
+    if (move_y < 1) move_y = 1;
+
+    for (int i = move_y; i >= 1; i--) {
+        if (in_bounds(x, y + i)) {
+            Particle *below = &sim->grid[idx(x, y + i)];
+            if (can_displace(p, below)) {
+                swap_particles(sim, x, y, x, y + i);
+                return;
+            }
+        }
+    }
+
+    int dir = (rng_xorshift(sim) % 2) ? -1 : 1;
+
+    if (in_bounds(x + dir, y + 1)) {
+        Particle *diag1 = &sim->grid[idx(x + dir, y + 1)];
+        if (can_displace(p, diag1)) {
+            swap_particles(sim, x, y, x + dir, y + 1);
+            return;
+        }
+    }
+
+    if (in_bounds(x - dir, y + 1)) {
+        Particle *diag2 = &sim->grid[idx(x - dir, y + 1)];
+        if (can_displace(p, diag2)) {
+            swap_particles(sim, x, y, x - dir, y + 1);
+            return;
+        }
+    }
+
+    int flow_distance = (int)(3.0f * (1.0f - props->viscosity)) + 1;
+    int flow_dir = (rng_xorshift(sim) % 2) ? -1 : 1;
+
+    for (int d = 0; d < 2; d++) {
+        int current_dir = (d == 0) ? flow_dir : -flow_dir;
+
+        for (int i = 1; i <= flow_distance; i++) {
+            int nx = x + i * current_dir;
+
+            if (!in_bounds(nx, y)) break;
+
+            Particle *side = &sim->grid[idx(nx, y)];
+
+            if (can_displace(p, side)) {
+                float new_vx = (float)current_dir;
+                swap_particles(sim, x, y, nx, y);
+                sim->grid[idx(nx, y)].vx = new_vx;
+                return;
+            } else if (side->active) {
+                break;
+            }
+        }
+    }
+
+    p->vy = 0;
+}
+
+static void update_gas(Simulation *sim, int x, int y) {
+    Particle *p = &sim->grid[idx(x, y)];
+    if (!p) return;
+
+    p->vy -= GRAVITY * 0.3f;
+
+    p->vx += (rng_xorshift(sim) - 0.5f) * 0.5f;
+    p->vy += (rng_xorshift(sim) - 0.5f) * 0.3f;
+
+    p->vx *= 0.9f;
+    p->vy *= 0.9f;
+
+    if (p->vy < -3.0f) p->vy = -3.0f;
+    if (p->vy > 2.0f) p->vy = 2.0f;
+    if (p->vx > 2.0f) p->vx = 2.0f;
+    if (p->vx < -2.0f) p->vx = -2.0f;
+
+    int move_y = (int)p->vy;
+
+    if (move_y < 0) {
+        for (int i = -1; i >= move_y; i--) {
+            if (is_empty(sim, x, y + i)) {
+                swap_particles(sim, x, y, x, y + i);
+                return;
+            }
+        }
+    }
+
+    int dirs[4][2] = {{-1, -1}, {1, -1}, {-1, 0}, {1, 0}};
+    int start = rng_xorshift(sim) % 4;
+
+    for (int i = 0; i < 4; i++) {
+        int idx = (start + i) % 4;
+        int nx = x + dirs[idx][0];
+        int ny = y + dirs[idx][1];
+
+        if (is_empty(sim, nx, ny)) {
+            swap_particles(sim, x, y, nx, ny);
+            return;
+        }
+    }
+
+    if (is_empty(sim, x, y - 1)) {
+        swap_particles(sim, x, y, x, y - 1);
+    }
+}
+
+static void update_solid(Simulation *sim, int x, int y) {
+    (void)sim;
+    (void)x;
+    (void)y;
+}
+
+// static void update_sand(Simulation *sim, int x, int y) {
+//     if (in_bounds(x, y + 1) && !get_particle(sim, x, y + 1)) {
+//         swap_particles(sim, x, y, x, y + 1);
+//         return;
+//     }
+
+//     int dir = (rng_xorshift(sim) % 2) ? -1 : 1;
+
+//     if (in_bounds(x + dir, y + 1) && !get_particle(sim, x + dir, y + 1)) {
+//         swap_particles(sim, x, y, x + dir, y + 1);
+//         return;
+//     }
+
+//     if (in_bounds(x - dir, y + 1) && !get_particle(sim, x - dir, y + 1)) {
+//         swap_particles(sim, x, y, x - dir, y + 1);
+//     }
+// }
+
+// static void update_water(Simulation *sim, int x, int y) {
+//     if (in_bounds(x, y + 1) && !get_particle(sim, x, y + 1)) {
+//         swap_particles(sim, x, y, x, y + 1);
+//         return;
+//     }
+
+//     int dir = (rng_xorshift(sim) % 2) ? -1 : 1;
+
+//     if (in_bounds(x + dir, y + 1) && !get_particle(sim, x + dir, y + 1)) {
+//         swap_particles(sim, x, y, x + dir, y + 1);
+//         return;
+//     }
+
+//     if (in_bounds(x - dir, y + 1) && !get_particle(sim, x - dir, y + 1)) {
+//         swap_particles(sim, x, y, x - dir, y + 1);
+//         return;
+//     }
+
+//     int flow_dir = (rng_xorshift(sim) % 2) ? -1 : 1;
+
+//     if (in_bounds(x + flow_dir, y) && !get_particle(sim, x + flow_dir, y)) {
+//         swap_particles(sim, x, y, x + flow_dir, y);
+//         return;
+//     }
+
+//     if (in_bounds(x - flow_dir, y) && !get_particle(sim, x - flow_dir, y)) {
+//         swap_particles(sim, x, y, x - flow_dir, y);
+//     }
+// }
+
+void update_particle(Simulation *sim, int x, int y) {
+    Particle *p = &sim->grid[idx(x, y)];
+
+    if (!p->active)
+        return;
+
+    const ParticleProperties *props = particles_get_properties(p->type);
+
+    update_temperature(sim, x, y);
+
+    check_reactions(sim, x, y);
+
+    p = &sim->grid[idx(x, y)];
+
+    if (!p->active)
+        return;
+
+    update_lifetime(sim, x, y);
+
+    p = &sim->grid[idx(x, y)];
+
+    if (!p->active)
+        return;
+
+    if (p->last_updated_tick == sim->current_tick)
+        return;
+
+    p->last_updated_tick = sim->current_tick;
+
+    switch (props->state) {
+        case STATE_POWDER:
+            update_powder(sim, x, y);
+            break;
+        case STATE_LIQUID:
+            update_liquid(sim, x, y);
+            break;
+        case STATE_SOLID:
+            update_solid(sim, x, y);
+            break;
+        case STATE_GAS:
+            update_gas(sim, x, y);
+            break;
+    }
+}
+
+void sim_update(Simulation *sim) {
+    // for (int y = SIM_HEIGHT - 1; y >= 0; y--) {
+    //     if (y % 2 == 0) {
+    //         for (int x = 0; x < SIM_WIDTH; x++) {
+    //             Particle *p = get_particle(sim, x, y);
+    //             if (!p)
+    //                 continue;
+
+    //             switch (p->type) {
+    //                 case PARTICLE_SAND:
+    //                     update_sand(sim, x, y);
+    //                     break;
+    //                 case PARTICLE_WATER:
+    //                     update_water(sim, x, y);
+    //                     break;
+    //                 default:
+    //                     break;
+    //             }
+    //         }
+    //     }
+    //     else {
+    //         for (int x = SIM_WIDTH - 1; x >= 0; x--) {
+    //             Particle *p = get_particle(sim, x, y);
+    //             if (!p)
+    //                 continue;
+
+    //             switch (p->type) {
+    //                 case PARTICLE_SAND:
+    //                     update_sand(sim, x, y);
+    //                     break;
+    //                 case PARTICLE_WATER:
+    //                     update_water(sim, x, y);
+    //                     break;
+    //                 default:
+    //                     break;
+    //             }
+    //         }
+    //     }
+    // }
+
+    sim->current_tick++;
+
+    bool left_to_right = (sim->current_tick % 2) == 0;
+
+    for (int y = SIM_HEIGHT - 1; y >= 0; y--) {
+        if (left_to_right) {
+            for (int x = 0; x < SIM_WIDTH; x++) {
+                update_particle(sim, x, y);
+            }
+        } else {
+            for (int x = SIM_WIDTH - 1; x >= 0; x--) {
+                update_particle(sim, x, y);
+            }
+        }
+    }
+}
+
+void sim_brush_cirlce(Simulation *sim, int cx, int cy, int radius, ParticleType type) {
+    int r2 = radius * radius;
+
+    for (int dy = -radius; dy <= radius; dy++) {
+        for (int dx = -radius; dx <= radius; dx++) {
+            if (dx * dx + dy * dy > r2)
+                continue;
+
+            int x = cx + dx;
+            int y = cy + dy;
+
+            sim_spawn_particles(sim, x, y, type);
+        }
+    }
+}
+
+void sim_brush_erase(Simulation *sim, int cx, int cy, int radius) {
+    int r2 = radius * radius;
+
+    for (int dy = -radius; dy <= radius; dy++) {
+        for (int dx = -radius; dx <= radius; dx++) {
+            if (dx * dx + dy * dy > r2)
+                continue;
+
+            int x = cx + dx;
+            int y = cy + dy;
+
+            sim_remove_particle(sim, x, y);
+        }
+    }
+}
+
+void sim_clear(Simulation *sim) {
+    memset(sim->grid, 0, sizeof(Particle) * SIM_WIDTH * SIM_HEIGHT);
+}

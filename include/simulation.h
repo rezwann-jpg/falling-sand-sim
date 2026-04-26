@@ -11,7 +11,8 @@
 typedef struct {
     int width;
     int height;
-    Particle *grid;
+    Particle *grid_current;
+    Particle *grid_next;
     unsigned int rng_state;
     int current_tick;
 } Simulation;
