@@ -20,6 +20,13 @@ static const struct {
     {PARTICLE_ASH, "Ash", COLOR_WHITE},
     {PARTICLE_ANT, "Ant", COLOR_CYAN},
     {PARTICLE_FLOWER, "Flower", COLOR_MAGENTA},
+    {PARTICLE_SPORE, "Spore", COLOR_YELLOW},
+    {PARTICLE_SPORELING, "Sporeling", COLOR_CYAN},
+    {PARTICLE_DEBRIS, "Debris", COLOR_WHITE},
+    {PARTICLE_DPL_A, "Life Red", COLOR_RED},
+    {PARTICLE_DPL_B, "Life Green", COLOR_GREEN},
+    {PARTICLE_DPL_C, "Life Blue", COLOR_BLUE},
+    {PARTICLE_DPL_SPAWNER, "DPL Spawner", COLOR_WHITE},
 };
 
 #define NUM_PARTICLES ((int)(sizeof(particles) / sizeof(particles[0])))

@@ -231,6 +231,111 @@ static const ParticleProperties PARTICLE_PROPERTIES[PARTICLE_COUNT] = {
         .lifetime = -1,
         .boils_into = PARTICLE_NONE,
         .burns_into = PARTICLE_FIRE,
+    },
+    {
+        .name = "Spore",
+        .state = STATE_POWDER,
+        .density = 1000.0f,
+        .friction = 0.5f,
+        .bounciness = 0.1f,
+        .viscosity = 0.0f,
+        .boiling_point = -1.0f,
+        .ignition_point = 250.0f,
+        .thermal_conductivity = 0.1f,
+        .flammability = 0.5f,
+        .lifetime = -1,
+        .boils_into = PARTICLE_NONE,
+        .burns_into = PARTICLE_FIRE,
+    },
+    {
+        .name = "Sporeling",
+        .state = STATE_SOLID,
+        .density = 1000.0f,
+        .friction = 0.1f,
+        .bounciness = 0.0f,
+        .viscosity = 0.0f,
+        .boiling_point = -1.0f,
+        .ignition_point = 150.0f,
+        .thermal_conductivity = 0.1f,
+        .flammability = 0.8f,
+        .lifetime = 100, // Energy
+        .boils_into = PARTICLE_NONE,
+        .burns_into = PARTICLE_FIRE,
+    },
+    {
+        .name = "Debris",
+        .state = STATE_POWDER,
+        .density = 600.0f,
+        .friction = 0.8f,
+        .bounciness = 0.0f,
+        .viscosity = 0.0f,
+        .boiling_point = -1.0f,
+        .ignition_point = 200.0f,
+        .thermal_conductivity = 0.1f,
+        .flammability = 0.9f,
+        .lifetime = -1,
+        .boils_into = PARTICLE_NONE,
+        .burns_into = PARTICLE_FIRE,
+    },
+    {
+        .name = "Life Red",
+        .state = STATE_SOLID,
+        .density = 1000.0f,
+        .friction = 0.5f,
+        .bounciness = 0.0f,
+        .viscosity = 0.0f,
+        .boiling_point = -1.0f,
+        .ignition_point = -1.0f,
+        .thermal_conductivity = 0.0f,
+        .flammability = 0.0f,
+        .lifetime = 1000, 
+        .boils_into = PARTICLE_NONE,
+        .burns_into = PARTICLE_NONE,
+    },
+    {
+        .name = "Life Green",
+        .state = STATE_SOLID,
+        .density = 1000.0f,
+        .friction = 0.5f,
+        .bounciness = 0.0f,
+        .viscosity = 0.0f,
+        .boiling_point = -1.0f,
+        .ignition_point = -1.0f,
+        .thermal_conductivity = 0.0f,
+        .flammability = 0.0f,
+        .lifetime = 1000, 
+        .boils_into = PARTICLE_NONE,
+        .burns_into = PARTICLE_NONE,
+    },
+    {
+        .name = "Life Blue",
+        .state = STATE_SOLID,
+        .density = 1000.0f,
+        .friction = 0.5f,
+        .bounciness = 0.0f,
+        .viscosity = 0.0f,
+        .boiling_point = -1.0f,
+        .ignition_point = -1.0f,
+        .thermal_conductivity = 0.0f,
+        .flammability = 0.0f,
+        .lifetime = 1000, 
+        .boils_into = PARTICLE_NONE,
+        .burns_into = PARTICLE_NONE,
+    },
+    {
+        .name = "DPL Spawner",
+        .state = STATE_GAS,
+        .density = 0.0f,
+        .friction = 0.0f,
+        .bounciness = 0.0f,
+        .viscosity = 0.0f,
+        .boiling_point = -1.0f,
+        .ignition_point = -1.0f,
+        .thermal_conductivity = 0.0f,
+        .flammability = 0.0f,
+        .lifetime = 0, 
+        .boils_into = PARTICLE_NONE,
+        .burns_into = PARTICLE_NONE,
     }
 };
 
@@ -272,6 +377,8 @@ Particle particle_create(ParticleType type, unsigned int *rng_state) {
         p.temperature = 600.0f + rng_float(rng_state) * 400.0f;
     } else if (type == PARTICLE_LAVA) {
         p.temperature = 1200.0f;
+    } else if (type == PARTICLE_SPORELING) {
+        p.vx = (rng_float(rng_state) > 0.5f) ? 1.0f : -1.0f;
     }
 
     return p;
@@ -295,7 +402,14 @@ void particles_init_colors() {
         COLOR_LAVA,
         COLOR_ASH,
         COLOR_ANT,
-        COLOR_FLOWER
+        COLOR_FLOWER,
+        COLOR_SPORE,
+        COLOR_SPORELING_1,
+        COLOR_DEBRIS,
+        COLOR_DPL_A,
+        COLOR_DPL_B,
+        COLOR_DPL_C,
+        COLOR_AIR // Spawner
     };
 
     for (int i = 0; i < PARTICLE_COUNT; i++) {
